@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f6f5fa" />
+    <meta name="description" content="Agent Lab，本地知识库 Agent 工作台。检索知识、查看工具调用、审批笔记写入，验证每一次执行。" />
+    <title>Agent Lab · 知识到行动</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%23715ce5'/%3E%3Cpath d='M16 8v9L9 29q-1 3 3 3h16q4 0 3-3l-7-12V8M14 8h12M13 24h14' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+      <symbol id="i-lab" viewBox="0 0 24 24"><path d="M9 3v6L3.5 19a1.4 1.4 0 0 0 1.2 2h14.6a1.4 1.4 0 0 0 1.2-2L15 9V3M8 3h8M6.5 15h11M9 18h.01M14 17h.01"/></symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></symbol>
+      <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 3H20v19H6.5A2.5 2.5 0 0 1 4 19.5v-14A2.5 2.5 0 0 1 6.5 3ZM8 7h8M8 11h5"/></symbol>
+      <symbol id="i-note" viewBox="0 0 24 24"><path d="M13 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8M15 3l6 6M9 15l1-4 8-8 3 3-8 8-4 1ZM7 18h10"/></symbol>
+      <symbol id="i-eval" viewBox="0 0 24 24"><path d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4M9 8l3 3L22 1M7 15h4M7 18h9"/></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+      <symbol id="i-up" viewBox="0 0 24 24"><path d="m6 11 6-6 6 6M12 5v14"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+      <symbol id="i-github" viewBox="0 0 24 24"><path d="M9 19c-4.3 1.2-4.3-2.2-6-2.7M15 22v-3.4a3 3 0 0 0-.8-2.3c2.8-.3 5.8-1.4 5.8-6.4A5 5 0 0 0 18.6 6a4.7 4.7 0 0 0-.1-3.8S17.4 1.8 15 3.6a13 13 0 0 0-6 0C6.6 1.8 5.5 2.2 5.5 2.2A4.7 4.7 0 0 0 5.4 6 5 5 0 0 0 4 9.9c0 5 3 6.1 5.8 6.4a3 3 0 0 0-.8 2.3V22"/></symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+      <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6ZM14 2v6h6M8 13h8M8 17h5"/></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path d="m12 2 9 4v6c0 5-9 10-9 10S3 17 3 12V6l9-4Z"/><path d="m8 12 3 3 5-6"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 16v5h16v-5"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></symbol>
+      <symbol id="i-zap" viewBox="0 0 24 24"><path d="m13 2-9 12h7l-1 8 10-12h-7l1-8Z"/></symbol>
+    </defs></svg>
+    <a class="skip-link" href="#main-content">跳到主要内容</a>
+    <div class="app-shell">
+      <button class="sidebar-backdrop" id="sidebar-backdrop" aria-label="关闭导航" hidden></button>
+      <aside class="sidebar" id="sidebar">
+        <a class="brand" href="#workbench" aria-label="Agent Lab 工作台"><span class="brand-mark"><svg class="icon"><use href="#i-lab"/></svg></span><span>Agent<span class="brand-light">Lab</span><span class="brand-caption">FROM KNOWLEDGE TO ACTION</span></span></a>
+        <button class="new-task" id="new-task"><svg class="icon"><use href="#i-plus"/></svg>新建任务<span>↗</span></button>
+        <span class="sidebar-label">WORKSPACE</span>
+        <nav class="main-nav" aria-label="主导航">
+          <button class="nav-item active" data-view="workbench" aria-current="page"><svg class="icon"><use href="#i-grid"/></svg>工作台</button>
+          <button class="nav-item" data-view="knowledge"><svg class="icon"><use href="#i-book"/></svg>知识库<span class="nav-count" id="document-count">0</span></button>
+          <button class="nav-item" data-view="notes"><svg class="icon"><use href="#i-note"/></svg>我的笔记<span class="nav-count" id="note-count">0</span></button>
+          <button class="nav-item" data-view="evaluations"><svg class="icon"><use href="#i-eval"/></svg>质量评测</button>
+        </nav>
+        <div class="history-heading"><span class="sidebar-label">最近任务</span><span id="history-count">0</span></div>
+        <div class="run-history" id="run-history"><p class="sidebar-empty">每一次探索，都会留在这里。</p></div>
+        <div class="sidebar-bottom"><div class="mode-card"><span class="mode-icon"><svg class="icon"><use href="#i-zap"/></svg></span><div><strong id="sidebar-mode">演示模式</strong><span id="sidebar-mode-description">无需 API Key，即刻体验</span></div><span class="status-dot"></span></div><div class="local-label"><span class="avatar">A</span><div><strong>个人工作空间</strong><span>本地运行 · 数据保存在此设备</span></div></div></div>
+      </aside>
+      <div class="main-shell">
+        <header class="topbar"><div class="breadcrumb"><button class="icon-button mobile-menu" id="mobile-menu" aria-label="打开导航" aria-expanded="false" aria-controls="sidebar"><svg class="icon"><use href="#i-menu"/></svg></button><span>个人空间</span><span class="breadcrumb-divider">/</span><strong id="breadcrumb-current">工作台</strong></div><div class="topbar-actions"><span class="connection" id="connection"><span class="status-dot"></span><span id="connection-label">正在连接</span></span><a class="github-link" href="https://github.com/huangyuke914235/program1" target="_blank" rel="noopener noreferrer"><svg class="icon"><use href="#i-github"/></svg><span>GitHub</span><span aria-hidden="true">↗</span></a></div></header>
+        <main id="main-content" tabindex="-1">
+          <section class="view" id="view-workbench" aria-labelledby="workbench-title">
+            <div class="page-intro"><div class="eyebrow"><span class="tiny-square"></span>YOUR PERSONAL AGENT WORKSPACE</div><h1 id="workbench-title">让知识，变成<span>行动。</span></h1><p>提出一个问题，观察 Agent 如何检索、调用工具，并给出有据可查的答案。</p></div>
+            <form class="composer" id="task-form"><label class="sr-only" for="question">告诉 Agent 你想完成什么</label><textarea id="question" name="question" rows="2" maxlength="4000" placeholder="今天，想让 Agent 帮你完成什么？" required></textarea><div class="composer-bottom"><span class="composer-context"><svg class="icon"><use href="#i-book"/></svg><span id="composer-source-count">知识库 · 0 篇文档</span><span class="composer-divider"></span><span id="composer-mode">Demo Agent</span></span><button class="submit-task" id="submit-task" type="submit"><span>开始执行</span><svg class="icon"><use href="#i-up"/></svg></button></div></form>
+            <div class="starter-prompts" aria-label="试试这些任务"><button class="starter-card" data-prompt="如何设计一个可靠的 Agent 工具调用循环？"><span class="starter-icon purple"><svg class="icon"><use href="#i-lab"/></svg></span><span><strong>搭建可靠的 Agent</strong><small>理解工具调用与执行边界</small></span><svg class="icon starter-arrow"><use href="#i-arrow"/></svg></button><button class="starter-card" data-prompt="总结 RAG 检索流程，保存为学习笔记"><span class="starter-icon blue"><svg class="icon"><use href="#i-book"/></svg></span><span><strong>把知识整理成笔记</strong><small>检索 → 总结 → 审批保存</small></span><svg class="icon starter-arrow"><use href="#i-arrow"/></svg></button><button class="starter-card" data-prompt="上线 Agent 前需要评测什么？"><span class="starter-icon green"><svg class="icon"><use href="#i-shield"/></svg></span><span><strong>检查上线准备</strong><small>用评测验证 Agent 的可靠性</small></span><svg class="icon starter-arrow"><use href="#i-arrow"/></svg></button></div>
+            <div class="workspace-heading"><div><h2>执行工作区</h2><span>每一步，都清晰可见</span></div><span class="pill" id="run-status"><span class="status-dot"></span>准备就绪</span></div>
+            <div class="workspace-grid"><article class="answer-panel panel"><div class="panel-heading"><h3><span class="panel-icon"><svg class="icon"><use href="#i-lab"/></svg></span>Agent 输出</h3><button class="icon-button" id="copy-answer" aria-label="复制答案" title="复制答案" hidden><svg class="icon"><use href="#i-copy"/></svg></button></div><div id="answer-content"><div class="empty-answer"><div class="empty-symbol"><svg class="icon"><use href="#i-lab"/></svg><span class="orbit-dot"></span></div><h3>一个问题，开启一次探索</h3><p>从上方输入任务，或选择一个示例。<br />答案、引用和工具执行过程会出现在这里。</p><div class="empty-flow"><span><b>01</b> 检索知识</span><i>→</i><span><b>02</b> 调用工具</span><i>→</i><span><b>03</b> 生成答案</span></div></div></div><div class="answer-footer" id="answer-footer"><svg class="icon"><use href="#i-shield"/></svg><span>写入笔记前始终需要你的审批</span></div></article><aside class="trace-panel panel"><div class="panel-heading"><h3><span class="panel-icon neutral"><svg class="icon"><use href="#i-clock"/></svg></span>执行记录</h3><span class="trace-count" id="trace-count">0 步</span></div><div class="trace-list" id="trace-list"><div class="trace-empty"><span class="waiting-dot"></span><strong>等待任务开始</strong><p>检索、工具调用和审批事件<br />将在这里依次记录。</p></div></div><div class="trace-legend"><span class="status-dot"></span>可观察的操作记录</div></aside></div>
+            <div class="workspace-footnote"><svg class="icon"><use href="#i-zap"/></svg><p id="mode-explanation">演示模式使用确定性流程运行真实检索与工具；连接模型后，由模型决定下一步操作。</p><span>LOCAL FIRST</span></div>
+          </section>
+          <section class="view" id="view-knowledge" aria-labelledby="knowledge-title" hidden><div class="section-header"><div><div class="eyebrow">KNOWLEDGE BASE</div><h1 id="knowledge-title">让 Agent 有据可依</h1><p>添加你的文档，Agent 会检索内容并在答案中保留引用。</p></div><button class="primary-button" id="add-document"><svg class="icon"><use href="#i-plus"/></svg>添加文档</button></div><div class="section-toolbar"><div class="search-field"><svg class="icon"><use href="#i-search"/></svg><label class="sr-only" for="knowledge-search">搜索知识库</label><input id="knowledge-search" type="search" placeholder="搜索标题或内容…" /></div><span id="knowledge-total" class="muted">0 篇文档</span></div><div class="document-grid" id="document-list"></div></section>
+          <section class="view" id="view-notes" aria-labelledby="notes-title" hidden><div class="section-header"><div><div class="eyebrow">YOUR KNOWLEDGE, CONNECTED</div><h1 id="notes-title">把发现，留给下一次</h1><p>这里的每一篇笔记，都由 Agent 整理，并经你确认后保存。</p></div><span class="pill"><svg class="icon"><use href="#i-shield"/></svg>审批后保存</span></div><div id="note-list" class="note-grid"></div></section>
+          <section class="view" id="view-evaluations" aria-labelledby="evaluations-title" hidden><div class="section-header"><div><div class="eyebrow">BUILD WITH CONFIDENCE</div><h1 id="evaluations-title">可靠性，要用结果证明</h1><p>运行独立演示评测，检查检索、引用、审批与执行边界。</p></div><button class="primary-button" id="run-evaluation"><svg class="icon"><use href="#i-eval"/></svg>运行评测</button></div><div class="evaluation-explainer"><span class="starter-icon purple"><svg class="icon"><use href="#i-eval"/></svg></span><div><strong>可重复的流程回归检查</strong><p>使用隔离的测试数据与演示 Agent，不消耗模型额度，也不会改动你的知识库或笔记。</p></div><span class="small-badge">DETERMINISTIC</span></div><div id="evaluation-results"></div></section>
+          <footer class="main-footer"><span><svg class="icon"><use href="#i-lab"/></svg>Agent Lab<span class="footer-divider">/</span>Small steps. Reliable agents.</span><span>用可见的过程，建立可信的结果。</span></footer>
+        </main>
+      </div>
+    </div>
+    <dialog id="document-dialog" aria-labelledby="document-dialog-title"><form id="document-form"><div class="dialog-heading"><div><span class="eyebrow">ADD KNOWLEDGE</span><h2 id="document-dialog-title">添加到知识库</h2></div><button type="button" class="icon-button close-dialog" aria-label="关闭"><svg class="icon"><use href="#i-close"/></svg></button></div><p class="dialog-description">粘贴文本或导入 Markdown / TXT 文档，内容将保存在本地。</p><label class="field-label" for="document-title">文档标题</label><input id="document-title" maxlength="160" placeholder="例如：我们的 Agent 开发规范" required /><label class="field-label" for="document-content">文档内容</label><textarea id="document-content" rows="10" maxlength="100000" placeholder="在这里粘贴文档内容…" required></textarea><div class="dialog-actions"><label class="secondary-button file-import"><svg class="icon"><use href="#i-upload"/></svg>导入文件<input id="file-input" type="file" accept=".md,.txt,.markdown,text/plain,text/markdown" /></label><button type="submit" class="primary-button" id="save-document">保存文档</button></div></form></dialog>
+    <dialog id="reader-dialog" class="reader-dialog" aria-labelledby="reader-title"><div class="dialog-heading"><div><span class="eyebrow" id="reader-eyebrow">KNOWLEDGE SOURCE</span><h2 id="reader-title"></h2></div><button type="button" class="icon-button close-dialog" aria-label="关闭"><svg class="icon"><use href="#i-close"/></svg></button></div><p class="reader-meta" id="reader-meta"></p><div id="reader-content" class="reader-content"></div><div class="dialog-actions"><button type="button" class="secondary-button close-dialog">关闭</button></div></dialog>
+    <dialog id="delete-dialog" aria-labelledby="delete-title" class="confirm-dialog"><div class="dialog-heading"><h2 id="delete-title">删除这篇文档？</h2><button type="button" class="icon-button close-dialog" aria-label="关闭"><svg class="icon"><use href="#i-close"/></svg></button></div><p id="delete-description"></p><p class="muted">删除后，新的任务将不会再检索到这篇文档。</p><div class="dialog-actions"><button type="button" class="secondary-button close-dialog">取消</button><button type="button" class="danger-button" id="confirm-delete">删除文档</button></div></dialog>
+    <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
+  </body>
+</html>
