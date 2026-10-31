@@ -20,7 +20,31 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
       - name: Test application behavior
         run: npm test
       - name: Evaluate deterministic agent workflows
         run: npm run eval
+
+  container:
+    name: Docker Compose / Ubuntu
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start container
+        run: docker compose up --build --detach --wait --wait-timeout 90
+      - name: Verify API and persist data across recreation
+        shell: bash
+        run: |
+          curl --fail --silent http://127.0.0.1:3000/api/health | jq -e '.status == "ok"'
+          curl --fail --silent -X POST http://127.0.0.1:3000/api/documents -H 'Content-Type: application/json' -d '{"title":"CI persistence","content":"Document saved in a Docker named volume."}' | jq -e '.document.title == "CI persistence"'
+          docker compose up --detach --force-recreate --wait --wait-timeout 90
+          curl --fail --silent http://127.0.0.1:3000/api/documents | jq -e '.documents | any(.title == "CI persistence")'
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose logs
+      - name: Remove CI containers and volumes
+        if: always()
+        run: docker compose down --volumes

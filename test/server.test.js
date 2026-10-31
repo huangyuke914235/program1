@@ -7,6 +7,7 @@ import { request as httpRequest } from 'node:http';
 import { createApp } from '../src/server.js';
 import { Store } from '../src/store.js';
 import { readConfig } from '../src/config.js';
+import { createProvider } from '../src/agent/providers.js';
 
 async function setup(t, store = new Store(':memory:', { seed: false })) {
   if (!store.documents().length) store.addDocument({ id: 'tools', title: 'Agent 工具调用循环', content: 'Agent 工具调用循环包括检索知识、读取文档、返回带引用的答案。工具参数需要验证，设置最大步数防止无限循环。保存笔记需要人工审批，拒绝后不应写入。' });
@@ -184,4 +185,23 @@ test('a pending approval survives a full app restart and resumes through HTTP', 
     if (second) await second.app.close();
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('SSE streams run updates and closes at completion without exposing internal state', async t => {
+  const store = new Store(':memory:', { seed: false });
+  store.addDocument({ id: 'tools', title: 'Agent 工具调用', content: 'Agent 工具调用需要检索知识、读取文档、验证参数并限制步数。' });
+  const demo = createProvider({ provider: 'demo' });
+  const provider = { name: 'demo', async next(options) { await new Promise(resolve => setTimeout(resolve, 20)); return demo.next(options); } };
+  const app = createApp({ config: { ...readConfig({}), port: 0 }, store, provider });
+  await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
+  t.after(() => app.close());
+  const base = `http://127.0.0.1:${app.server.address().port}`;
+  const created = await fetch(`${base}/api/runs`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: 'Agent 工具调用流程是什么？' }) }).then(r => r.json());
+  const response = await fetch(`${base}/api/runs/${created.run.id}/events`);
+  assert.match(response.headers.get('content-type'), /^text\/event-stream/);
+  const stream = await response.text();
+  const events = stream.split('\n\n').filter(Boolean).map(item => JSON.parse(item.split('\ndata: ')[1]));
+  assert.ok(events.length > 1, '应收到初始快照及后续变化');
+  assert.equal(events.at(-1).status, 'completed');
+  assert.ok(events.every(run => !Object.hasOwn(run, 'state')), '内部上下文不应泄露');
 });

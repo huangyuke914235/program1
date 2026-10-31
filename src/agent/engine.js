@@ -26,7 +26,7 @@ function record(run, type, title, detail, durationMs) {
 
 function addCitation(run, document, excerpt) {
   if (!run.citations.some(citation => citation.documentId === document.id)) {
-    run.citations.push({ documentId: document.id, title: document.title, excerpt });
+    run.citations.push({ documentId: document.id, title: document.title, excerpt, ...(Number.isInteger(document.startOffset) ? { startOffset: document.startOffset, endOffset: document.endOffset } : {}) });
   }
 }
 
@@ -155,7 +155,7 @@ export async function advanceRun(run, { provider, documents = [], saveNote, pers
         record(run, 'tool', 'search_knowledge · 检索资料', `关键词：${args.query}；找到 ${results.length} 份相关文档`, Date.now() - startedAt);
       } else if (call.name === 'read_document') {
         const document = documents.find(item => item.id === args.id);
-        output = document ? { document: { id: document.id, title: document.title, content: document.content.slice(0, 20000), truncated: document.content.length > 20000 } } : { error: 'Document not found. Search for a valid document id.' };
+        output = document ? { document: { id: document.id, title: document.title, content: document.content.length > 20000 ? excerptFor(document, run.question, 12000) : document.content, truncated: document.content.length > 20000 } } : { error: 'Document not found. Search for a valid document id.' };
         if (document) addCitation(run, document, excerptFor(document, run.question));
         record(run, document ? 'tool' : 'tool_error', 'read_document · 读取文档', document ? `读取「${document.title}」` : '未找到该文档', Date.now() - startedAt);
       }

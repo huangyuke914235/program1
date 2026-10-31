@@ -7,6 +7,8 @@ import { Store } from './store.js';
 import { createRun, advanceRun } from './agent/engine.js';
 import { createProvider } from './agent/providers.js';
 import { runEvaluation } from './evaluation.js';
+import { z } from 'zod';
+import pino from 'pino';
 
 const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png' };
@@ -16,8 +18,9 @@ const publicRun = run => {
   return safe;
 };
 function text(value, field, max) {
-  if (typeof value !== 'string' || !value.trim() || value.length > max) throw httpError(400, `${field} 必须为 1–${max} 个字符`);
-  return value.trim();
+  const result = z.string().max(max).trim().min(1).safeParse(value);
+  if (!result.success) throw httpError(400, `${field} 必须为 1–${max} 个字符`);
+  return result.data;
 }
 async function body(req) {
   if (!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] || '')) throw httpError(415, '请求需要 application/json');
@@ -37,23 +40,39 @@ async function body(req) {
 export function createApp({ config = readConfig(), store = new Store(join(config.dataDir, 'agent-lab.sqlite')), provider = createProvider(config) } = {}) {
   store.recoverInterruptedRuns();
   const active = new Map();
+  const subscribers = new Map();
+  const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
   let evaluationActive = false;
   let closing;
+  function publish(run) {
+    const streams = subscribers.get(run.id);
+    if (!streams) return;
+    const payload = `event: run\ndata: ${JSON.stringify(publicRun(run))}\n\n`;
+    for (const stream of streams) {
+      if (!stream.destroyed && !stream.writableEnded) {
+        stream.write(payload);
+        if (['completed', 'failed', 'waiting_approval'].includes(run.status)) stream.end();
+      }
+    }
+  }
   function launch(run, decision) {
     const approvalId = run.pendingApproval?.id;
     const task = Promise.resolve().then(() => advanceRun(run, {
       provider, documents: store.documents(), maxSteps: config.maxSteps,
       saveNote: note => store.saveNote(note, `${run.id}:${approvalId || 'note'}`),
-      persist: current => store.saveRun(current), decision,
+      persist: current => { store.saveRun(current); publish(current); }, decision,
     })).catch(error => {
       run.status = 'failed';
       run.error = config.apiKey ? String(error.message).split(config.apiKey).join('[redacted]') : String(error.message);
       run.updatedAt = new Date().toISOString();
       store.saveRun(run);
+      publish(run);
     }).finally(() => active.delete(run.id));
     active.set(run.id, task);
   }
   const server = createServer(async (req, res) => {
+    const started = performance.now();
+    res.on('finish', () => logger.info({ method: req.method, path: (req.url || '').split('?')[0], status: res.statusCode, durationMs: Math.round(performance.now() - started) }, 'request completed'));
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
@@ -88,12 +107,23 @@ export function createApp({ config = readConfig(), store = new Store(join(config
         launch(run);
         return;
       }
-      const runMatch = path.match(/^\/api\/runs\/([^/]+)(\/approval)?$/);
+      const runMatch = path.match(/^\/api\/runs\/([^/]+)(\/approval|\/events)?$/);
       if (runMatch) {
         let run = store.run(decodeURIComponent(runMatch[1]));
         if (!run) throw httpError(404, '运行记录不存在');
+        if (method === 'GET' && runMatch[2] === '/events') {
+          const streams = subscribers.get(run.id) || new Set();
+          if (streams.size >= 20) throw httpError(429, '实时连接过多');
+          subscribers.set(run.id, streams);
+          streams.add(res);
+          res.on('close', () => { streams.delete(res); if (!streams.size) subscribers.delete(run.id); });
+          res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Connection': 'keep-alive', 'Cache-Control': 'no-cache, no-transform', 'X-Accel-Buffering': 'no' });
+          res.write(`event: run\ndata: ${JSON.stringify(publicRun(run))}\n\n`);
+          if (['completed', 'failed', 'waiting_approval'].includes(run.status)) res.end();
+          return;
+        }
         if (method === 'GET' && !runMatch[2]) return json(200, { run: publicRun(run) });
-        if (method === 'POST' && runMatch[2]) {
+        if (method === 'POST' && runMatch[2] === '/approval') {
           const input = await body(req);
           // Parsing can yield while another request completes this approval.
           // Reload immediately before the synchronous validation/claim section.
@@ -135,6 +165,7 @@ export function createApp({ config = readConfig(), store = new Store(join(config
   });
   return { server, store, close() {
     closing ||= (async () => {
+      for (const streams of subscribers.values()) for (const stream of streams) stream.end();
       await new Promise(resolve => { server.close(resolve); server.closeIdleConnections(); });
       await Promise.allSettled([...active.values()]);
       store.close();

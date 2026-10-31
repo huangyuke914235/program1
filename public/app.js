@@ -1,6 +1,6 @@
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
-const state = { view: 'workbench', config: { provider: 'demo' }, documents: [], notes: [], runs: [], evaluations: [], selectedRun: null, pollTimer: null, pollGeneration: 0, submitting: false, approving: false, evaluating: false, deletingId: null, connected: false };
+const state = { view: 'workbench', config: { provider: 'demo' }, documents: [], notes: [], runs: [], evaluations: [], selectedRun: null, pollTimer: null, runStream: null, pollGeneration: 0, submitting: false, approving: false, evaluating: false, deletingId: null, connected: false };
 const statuses = { queued: '等待执行', running: '正在执行', waiting_approval: '等待你的审批', completed: '执行完成', failed: '执行失败' };
 const viewNames = { workbench: '工作台', knowledge: '知识库', notes: '我的笔记', evaluations: '质量评测' };
 
@@ -259,7 +259,52 @@ function updateRun(run) {
 
 function stopPolling() {
   clearTimeout(state.pollTimer);
+  state.runStream?.close();
+  state.runStream = null;
   state.pollGeneration += 1;
+}
+
+async function handleRunUpdate(run, generation) {
+  if (generation !== state.pollGeneration) return;
+  updateRun(run);
+  if (state.selectedRun?.id === run.id) renderRun();
+  if (run.status === 'completed') {
+    try {
+      const { notes } = await api('/api/notes');
+      if (generation === state.pollGeneration) { state.notes = notes; renderNotes(); }
+    } catch (error) { if (generation === state.pollGeneration) toast(error.message, true); }
+  }
+}
+
+// Prefer a live stream; if unavailable or interrupted, resume from the latest
+// persisted run through the existing polling endpoint.
+function watchRun(runId, generation = state.pollGeneration) {
+  if (generation !== state.pollGeneration) return;
+  if (typeof EventSource === 'undefined') { pollRun(runId, generation); return; }
+  let stream;
+  try { stream = new EventSource(`/api/runs/${encodeURIComponent(runId)}/events`); }
+  catch { pollRun(runId, generation); return; }
+  state.runStream = stream;
+  stream.addEventListener('run', event => {
+    if (generation !== state.pollGeneration || state.runStream !== stream) return;
+    let run;
+    try { const data = JSON.parse(event.data); run = data.run || data; }
+    catch { stream.close(); state.runStream = null; pollRun(runId, generation); return; }
+    if (!run || run.id !== runId || typeof run.status !== 'string') {
+      stream.close(); state.runStream = null; pollRun(runId, generation); return;
+    }
+    void handleRunUpdate(run, generation);
+    if (!['queued', 'running'].includes(run.status)) {
+      stream.close();
+      state.runStream = null;
+    }
+  });
+  stream.onerror = () => {
+    if (generation !== state.pollGeneration || state.runStream !== stream) return;
+    stream.close();
+    state.runStream = null;
+    pollRun(runId, generation);
+  };
 }
 
 function pollRun(runId, generation = state.pollGeneration, failures = 0) {
@@ -268,12 +313,8 @@ function pollRun(runId, generation = state.pollGeneration, failures = 0) {
     try {
       const { run } = await api(`/api/runs/${encodeURIComponent(runId)}`);
       if (generation !== state.pollGeneration) return;
-      updateRun(run);
-      if (state.selectedRun?.id === runId) renderRun();
+      await handleRunUpdate(run, generation);
       if (['queued', 'running'].includes(run.status)) pollRun(runId, generation);
-      else if (run.status === 'completed') {
-        try { const { notes } = await api('/api/notes'); state.notes = notes; renderNotes(); } catch (error) { toast(error.message, true); }
-      }
     } catch (error) {
       if (generation !== state.pollGeneration) return;
       if (failures < 4) pollRun(runId, generation, failures + 1);
@@ -294,7 +335,7 @@ async function selectRun(id) {
     state.selectedRun = run;
     updateRun(run);
     renderRun();
-    if (['queued', 'running'].includes(run.status)) pollRun(id, generation);
+    if (['queued', 'running'].includes(run.status)) watchRun(id, generation);
   } catch (error) { toast(error.message, true); }
 }
 
@@ -318,7 +359,7 @@ async function submitTask(event) {
     updateRun(run);
     renderRun();
     $('#question').value = '';
-    if (['queued', 'running'].includes(run.status)) pollRun(run.id);
+    if (['queued', 'running'].includes(run.status)) watchRun(run.id);
   } catch (error) { toast(error.message, true); }
   finally { state.submitting = false; $('#submit-task').disabled = false; }
 }
@@ -331,10 +372,10 @@ async function decideApproval(approved) {
   try {
     const { run } = await api(`/api/runs/${encodeURIComponent(selected.id)}/approval`, { method: 'POST', body: JSON.stringify({ approved, approvalId: selected.pendingApproval.id }) });
     // The 202 response is a snapshot taken before the worker resumes. Hide the
-    // consumed approval locally and poll even if that snapshot is still waiting.
+    // consumed approval locally and watch even if that snapshot is still waiting.
     const continuing = { ...run, status: 'running', pendingApproval: null };
     updateRun(continuing);
-    if (state.selectedRun?.id === run.id) { renderRun(); stopPolling(); pollRun(run.id); }
+    if (state.selectedRun?.id === run.id) { renderRun(); stopPolling(); watchRun(run.id); }
     toast(approved ? '已批准写入，Agent 将继续执行。' : '已拒绝写入，Agent 将继续执行。');
     const { notes } = await api('/api/notes');
     state.notes = notes;
@@ -409,7 +450,7 @@ async function initialize() {
   if (failure) toast(failure.reason.message, true);
   renderCounts();
   const active = state.runs.find(run => ['queued', 'running', 'waiting_approval'].includes(run.status));
-  if (active) { state.selectedRun = active; renderHistory(); renderRun(); if (active.status !== 'waiting_approval') pollRun(active.id); }
+  if (active) { state.selectedRun = active; renderHistory(); renderRun(); if (active.status !== 'waiting_approval') watchRun(active.id); }
 }
 
 $$('svg').forEach(svg => { svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('focusable', 'false'); });

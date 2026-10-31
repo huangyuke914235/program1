@@ -1,0 +1,16 @@
+services:
+  agent:
+    build: .
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    environment:
+      AGENT_PROVIDER: ${AGENT_PROVIDER:-demo}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+    volumes:
+      - agent-data:/app/data
+    init: true
+    restart: unless-stopped
+
+volumes:
+  agent-data:

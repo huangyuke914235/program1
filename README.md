@@ -2,7 +2,7 @@
 
 一个可以运行、观察和修改的 Agent 应用底座：导入资料，提交任务，查看工具调用和来源，并在保存笔记前由你批准。
 
-**默认免 API Key、零 npm 依赖、数据保存在本地 SQLite。** 演示模式使用确定性流程；切换到 OpenAI 模式后，由真实模型选择工具并组织回答。
+**默认免 API Key，数据保存在本地 SQLite。** 演示模式使用确定性流程；切换到 OpenAI 模式后，由真实模型选择工具并组织回答。
 
 ![Agent Lab 工作台：知识检索、来源与执行记录](docs/screenshot.png)
 
@@ -13,10 +13,13 @@
 ```bash
 git clone https://github.com/huangyuke914235/program1.git
 cd program1
+npm ci
 npm start
 ```
 
-打开 [http://127.0.0.1:3000](http://127.0.0.1:3000)。没有第三方运行时依赖，无需执行 `npm install`。
+打开 [http://127.0.0.1:3000](http://127.0.0.1:3000)。`npm ci` 根据锁文件安装依赖。
+
+也可以安装 Docker 后运行 `docker compose up --build -d`，使用 `docker compose down` 停止。默认只在本机开放 3000 端口；笔记和知识保存在 Docker 命名卷，停止容器后仍会保留。端口冲突时可在启动前设置 `APP_PORT`。Compose 从环境或 `.env` 读取模型配置，不会将密钥写入镜像。
 
 可以直接试这三个任务：
 
@@ -31,7 +34,10 @@ npm start
 | 能力 | 可验证的行为 |
 | --- | --- |
 | 工具调用循环 | 检索知识、读取文档、返回结果，再继续调用或结束；限制执行步数 |
-| 本地知识检索 | 支持中英文词法检索，答案附带实际来源和证据摘录 |
+| 本地知识检索 | 文档分块、BM25 词法排序、来源摘录及文档偏移 |
+| 实时状态 | SSE 推送执行进度，连接失败时自动回退到轮询 |
+| 参数校验和日志 | Zod 检查输入，Pino 输出请求级结构化日志 |
+| 容器化 | Docker Compose 启动服务，SQLite 数据保存在命名卷 |
 | 人工审批 | `save_note` 在执行前暂停，批准或拒绝绑定当前审批 ID |
 | 执行记录 | 展示工具执行、检索概况、审批和错误；可重新打开历史任务 |
 | SQLite 持久化 | 保存文档、任务上下文、待审批动作、笔记和评测报告 |
@@ -63,7 +69,7 @@ npm test
 npm run eval
 ```
 
-测试覆盖工具循环、HTTP 接口、参数验证、写入审批、重复审批、持久化等行为。内置评测使用独立的演示数据，不消耗模型额度、不修改你的知识库。GitHub Actions 在 Windows 和 Linux 上执行相同检查。
+测试覆盖分块检索、SSE、HTTP 接口、参数验证、写入审批、重复审批、持久化等行为。内置评测使用独立的演示数据，不消耗模型额度、不修改你的知识库。GitHub Actions 在 Windows 和 Linux 上执行检查，并在 Linux 验证 Docker 构建、健康检查和数据持久化。
 
 真实模型适配器包含模拟 Responses 返回的协议测试；当前交付未使用付费 API Key 进行在线模型调用验证。
 
@@ -76,16 +82,17 @@ public/                 工作台、知识库、笔记与评测界面
 src/agent/engine.js      有限执行循环、状态转换与审批
 src/agent/providers.js   确定性演示 / OpenAI Responses 适配
 src/agent/tools.js       工具定义与运行时参数验证
-src/agent/retrieval.js   中英文词法检索与证据摘录
+src/agent/retrieval.js   文档分块、BM25 词法检索与证据摘录
 src/server.js           HTTP 接口与运行调度
 src/store.js            SQLite 存储和恢复
 src/evaluation.js       应用行为评测
 examples/knowledge/     首次启动导入的示例文档
 test/                   自动化测试
+Dockerfile / compose.yaml 容器镜像、服务和数据卷
 ```
 
 具体设计见 [架构与学习路线](docs/architecture.md)，接口用法见 [API 文档](docs/api.md)。
 
-这是面向本地单用户开发的应用，默认只监听回环地址。检索采用词法匹配，未实现嵌入或向量数据库；演示回答主要组织来源摘录，不能代表真实模型的推理能力。内置评测验证应用机制，真实模型质量需要独立评测。公网和多用户部署需要另外设计身份认证、访问控制与运维机制。
+这是面向本地单用户开发的应用，默认只监听回环地址。BM25 是词法检索，未实现嵌入或向量数据库；演示回答主要组织来源摘录，不能代表真实模型的推理能力。内置评测验证应用机制，真实模型质量需要独立评测。公网和多用户部署需要另外设计身份认证、访问控制与运维机制。
 
 采用 [MIT License](LICENSE)。

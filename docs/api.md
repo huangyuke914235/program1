@@ -14,6 +14,7 @@
 | GET | `/api/runs` | 最近 100 条运行记录 |
 | POST | `/api/runs` | 创建任务，参数 `{question}`，返回 HTTP 202 |
 | GET | `/api/runs/:id` | 查询任务状态、结果、记录与待审批动作 |
+| GET | `/api/runs/:id/events` | SSE 推送运行快照和后续状态，进入等待审批或终态时关闭 |
 | POST | `/api/runs/:id/approval` | 提交 `{approved, approvalId}`，返回 HTTP 202 |
 | GET | `/api/notes` | 已保存笔记 |
 | GET | `/api/evaluations` | 最近 20 次评测报告 |
@@ -33,6 +34,8 @@ Content-Type: application/json
 服务器先返回 `{run: {...}}`，再异步执行。按返回的运行 ID 查询 `/api/runs/:id`。`queued` 和 `running` 表示仍在执行；`waiting_approval` 表示等待用户；`completed` 或 `failed` 表示本轮结束。
 
 公开运行记录包含 `id`、`question`、`status`、`createdAt`、`updatedAt`、`answer`、`citations`、`steps`、`usage` 和 `pendingApproval`。内部 provider 上下文不通过接口返回。
+
+实时接口使用 `text/event-stream`，每条 `event: run` 的 `data` 是公开运行对象。浏览器断线时可回退到 `GET /api/runs/:id`。检索结果及来源可带有 `startOffset`、`endOffset`，单位是原文中的 UTF-16 代码单元。
 
 ## 提交审批
 

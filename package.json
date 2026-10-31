@@ -4,12 +4,18 @@
   "private": true,
   "description": "A local-first knowledge agent workbench with tool traces, human approval and evaluations.",
   "type": "module",
-  "engines": { "node": ">=24.14.0" },
+  "engines": {
+    "node": ">=24.14.0"
+  },
   "scripts": {
     "start": "node --env-file-if-exists=.env src/server.js",
     "dev": "node --watch --env-file-if-exists=.env src/server.js",
     "test": "node --test",
     "eval": "node scripts/evaluate.js"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "pino": "^10.4.0",
+    "zod": "^4.6.7"
+  }
 }
